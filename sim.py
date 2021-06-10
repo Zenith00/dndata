@@ -10,17 +10,6 @@ from entity import Monster, Player
 from rules import make_statblock
 from simulator import attack
 
-mon = Monster(
-   name="generic",
-   cr=4,
-   ac=1,
-   hp=1,
-   attacks={},
-   stats=make_statblock((20, True), (20, False), (20, True), (8, False), (8, False), (8, False)),
-   spellcasting="STR"
-)
-MAX = make_statblock((20, True), (20, True), (20, True), (20, True), (20, True), (20, True))
-
 AC = [
    # 0  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18  19, 20
    -1, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 17, 17, 17, 17, 19, 19, 19, 19, 19, 25
@@ -81,7 +70,6 @@ class DPR:
 
       def sim_decorator(f: ty.Callable[[], float]):
          self.damage_sims[name] = player, target, f
-         # return numba.jit(f)
          return f
 
       return sim_decorator
