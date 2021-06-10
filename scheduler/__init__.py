@@ -3,18 +3,21 @@ from __future__ import annotations
 import datetime
 
 import aurflux.context
+import discord
 from aurflux.command import Response
 from aurflux import FluxCog
 import typing as ty
 import dateparser
 import enum
+import pendulum
 
 
 class Scheduler(FluxCog):
+   name = "scheduler"
 
    def load(self) -> None:
       @self._commandeer(name="schedule")
-      async def schedule(ctx: aurflux.context.GuildMessageCtx, args: str):
+      async def schedule(ctx: aurflux.context.GuildMessageCtx, args: str, **_):
          """
          schedule party datetime
          ==
@@ -23,24 +26,34 @@ class Scheduler(FluxCog):
          :param args:
          :return:
          """
-         party, timeslot_raw, *_ = *args.split(" ", 1), None
 
-         PARTIES: ty.Dict[str, ty.Dict[str, str]] = {
-            "purple": {"default": "next saturday at 6:15 PM PST", "late": "next saturday at 8:00 PM PST"}
+         party, session, timeslot_raw, *_ = *args.split(" ", 2), None, None
+         print(party)
+         print(session)
+         print(timeslot_raw)
+         print(_)
+
+         PARTIES: ty.Dict[str, ty.Dict[str, ty.Callable[..., pendulum.DateTime]]] = {
+            "purple": {"name": "Party 2", "default": lambda: pendulum.now().next(pendulum.SATURDAY).at(hour=18, minute=15),
+                       "late": lambda: pendulum.now().next(pendulum.SATURDAY).at(hour=20)}
          }
 
          if party not in PARTIES:
             raise aurflux.CommandError(f"Party not recognized: `{party}`")
 
-
          if timeslot_raw is None:
-            timeslot : ty.Optional[datetime.datetime] = dateparser.parse(PARTIES[party]["default"])
-
-         elif (timeslot_expanded := PARTIES[party].get(timeslot_raw)):
-            timeslot : ty.Optional[datetime.datetime] = dateparser.parse(timeslot_expanded)
+            timeslot: ty.Optional[datetime.datetime] = PARTIES[party]["default"]()
+         elif timeslot_func := PARTIES[party].get(timeslot_raw):
+            timeslot = timeslot_func()
          else:
-            timeslot : ty.Optional[datetime.datetime] = dateparser.parse(timeslot_raw)
-         if not timeslot:
-            raise aurflux.CommandError(f"Did not recognize time string: `{timeslot_raw}`")
+            timeslot = eval(timeslot_raw)
 
-         return Response(timeslot.isoformat())
+         embed = discord.Embed(
+            title=PARTIES[party]["name"],
+            description=(f"[{timeslot.strftime('%A, %B %d at %#I:%M %p PT')}]"
+                         f"(https://www.timeanddate.com/worldclock/fixedtime.html?" +
+                         (f"msg={PARTIES[party]['name']}+Session+14&iso={timeslot.strftime('%Y%m%dT%H%M')}&p1=283&ah=4)".replace(" ", "+"))),
+
+         )
+
+         yield Response(embed=embed)

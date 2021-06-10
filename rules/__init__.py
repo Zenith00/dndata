@@ -1,3 +1,4 @@
+import pprint
 import typing as ty
 import enum
 
@@ -21,6 +22,10 @@ class _STAT(ty.TypedDict):
    VALUE: int
    PROFICIENT: bool
 
+   @classmethod
+   def fromtuple(cls, t: ty.Tuple[int, bool]):
+      return cls.__init__(VALUE=t[0], PROFICIENT=t[1])
+
 
 STAT = ty.Literal["STR", "DEX", "CON", "INT", "WIS", "CHA"]
 
@@ -32,6 +37,27 @@ class STATBLOCK(ty.TypedDict):
    INT: _STAT
    WIS: _STAT
    CHA: _STAT
+
+
+def make_statblock(
+      STR: ty.Tuple[int, bool],
+      DEX: ty.Tuple[int, bool],
+      CON: ty.Tuple[int, bool],
+      INT: ty.Tuple[int, bool],
+      WIS: ty.Tuple[int, bool],
+      CHA: ty.Tuple[int, bool],
+      ATK: STAT = None
+):
+   return STATBLOCK(
+      STR=_STAT(VALUE=STR[0], PROFICIENT=STR[1]),
+      DEX=_STAT(VALUE=DEX[0], PROFICIENT=DEX[1]),
+      CON=_STAT(VALUE=CON[0], PROFICIENT=CON[1]),
+      INT=_STAT(VALUE=INT[0], PROFICIENT=INT[1]),
+      WIS=_STAT(VALUE=WIS[0], PROFICIENT=WIS[1]),
+      CHA=_STAT(VALUE=CHA[0], PROFICIENT=CHA[1]),
+   )
+
+
 
 
 class CL:
@@ -102,3 +128,19 @@ CLASS_SAVE_PROFS = {  # str  dex con int wis cha
    CLASSES.WARLOCK  : [False, False, False, False, True, True],
    CLASSES.WIZARD   : [False, False, False, True, True, False],
 }
+
+SPELLSLOTS = [[0]*9] + [[
+   int(i >= 1) * 2 + int(i >= 2) * 1 + int(i >= 3) * 1,  # 1st
+   int(i >= 3) * 2 + int(i >= 4) * 1,  # 2nd
+   int(i >= 5) * 2 + int(i >= 6) * 1,  # 3rd
+   int(i >= 7) * 1 + int(i >= 8) * 1 + int(i >= 9) * 1,  # 4th
+   int(i >= 9) * 1 + int(i >= 10) * 1,  # 5th
+   int(i >= 11) * 1 + int(i >= 19) * 1,  # 6th
+   int(i >= 13) * 1 + int(i >= 20) * 1,  # 7th
+   int(i >= 15) * 1,  # 8th
+   int(i >= 17) * 1,  # 9th
+
+] for i in range(1, 21)]
+
+
+PROF = lambda level: 2 + max(((level - 1) // 4), 0)

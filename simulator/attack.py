@@ -4,9 +4,10 @@ import itertools as itt
 import typing as ty
 
 import rules
+from decimal import Decimal
 
 if ty.TYPE_CHECKING:
-   from entity import Entity
+   from entity import Entity, Player
 from rules import STATBLOCK, STAT
 
 Z = itt.repeat(0)
@@ -31,7 +32,7 @@ def factor_ac(bonus, target_ac, damage, adv=0):
       hit_chance = (to_hit(bonus, target_ac)) ** (-1 + -adv)
    else:
       hit_chance = 1 - ((1 - (to_hit(bonus, target_ac))) ** (1 + adv))
-   return hit_chance * damage
+   return Decimal(hit_chance) * Decimal(damage)
 
 
 def factor_save(dc: int, save_mod: int, damage: float, save_type: SAVE_TYPE = "none"):
@@ -73,13 +74,28 @@ class Attack(Damager):
    def __init__(self, stat: ty.Union[rules.STAT, ty.Literal["SPELL"]], **kwargs):
       super(Attack, self).__init__(**kwargs)
       self.stat = stat
+      self.hit_bonus :int = kwargs.pop("hit_bonus", 0)
 
    def damage(self, source: Entity = None, target: Entity = None, adv=0):
       _stat: rules.STAT = self.stat if self.stat != "SPELL" else source.spellcasting
-      return factor_ac(source.stats[_stat], target.ac, self.damage_raw(), adv=adv)
+      total_hit_mod = (source.stats[_stat]["VALUE"]-10)//2 + self.hit_bonus
+      return factor_ac(total_hit_mod , target.ac, self.damage_raw(source=source, target=target), adv=adv)
 
-   def gen(self,  source: Entity = None, target: Entity = None, adv=0) -> ty.Iterable[int]:
-      return self._gen or itt.chain(itt.islice(Z, self.start), itt.islice(itt.repeat(self.damage(source=source, target=target, adv=adv)), self.n), Z)
+   def gen(self, source: Entity = None, target: Entity = None, adv=0) -> ty.Iterable[int]:
+      return self._gen or itt.chain(itt.islice(Z, self.start), itt.islice((self.damage(source=source, target=target, adv=adv) for _ in itt.repeat(0)), self.n), Z)
+
+
+class Smite(Attack):
+   def __init__(self, stat,  **kwargs):
+      super(Smite, self).__init__(stat=stat, **kwargs)
+
+   def damage_raw(self, source: Player = None, target: Entity = None):
+      highest_slot, _ = next((ss for ss in list(enumerate(source.spellslots))[::-1] if ss[1]), (None, None))
+      if highest_slot is None:
+         return 0
+      source.spellslots[highest_slot] -= 1
+      print(source.spellslots)
+      return 9+(4.5*max(highest_slot,3))
 
 
 class SaveOrHalf(Damager):
@@ -99,5 +115,11 @@ class AttackPlusMod(Attack):
    def damage_raw(self, source: Entity = None, target: Entity = None, adv=0):
       if not source:
          raise RuntimeError()
-      _stat: rules.STAT = self.stat if self.stat != "SPELL" else source.spellcasting
-      return self.base + source.stats[_stat]
+      stat: rules.STAT = self.stat if self.stat != "SPELL" else source.spellcasting
+      return self.base + source.modifiers[stat]
+
+
+def GWMSS(attack: AttackPlusMod):
+   attack.base += 10
+   attack.hit_bonus -= 5
+   return attack
